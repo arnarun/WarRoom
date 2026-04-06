@@ -40,8 +40,14 @@ scheduler = AsyncIOScheduler()
 
 async def _run(fetcher, *args):
     """Wrap a fetcher in a fresh DB session."""
-    async with AsyncSessionLocal() as session:
-        await fetcher(session, *args)
+    name = fetcher.__name__
+    logger.info("[scheduler] Starting %s", name)
+    try:
+        async with AsyncSessionLocal() as session:
+            await fetcher(session, *args)
+        logger.info("[scheduler] Finished %s", name)
+    except Exception as exc:
+        logger.error("[scheduler] %s FAILED: %s", name, exc, exc_info=True)
 
 
 def _schedule_job(fetcher, interval_seconds: int, run_now: bool = True):
