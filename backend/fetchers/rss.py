@@ -46,29 +46,41 @@ def _get_image(entry) -> Optional[str]:
 async def fetch_all_rss(session: AsyncSession) -> int:
     sources = json.loads(SOURCES_PATH.read_text())
     total = 0
+    ok_count = 0
+    fail_count = 0
+    empty_count = 0
     connector = aiohttp.TCPConnector(ssl=False, limit=20)
     async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
         for src in sources:
             try:
-                count = await _fetch_one(session, src, http)
+                count, status = await _fetch_one(session, src, http)
                 total += count
+                if status == "ok":     ok_count += 1
+                elif status == "empty": empty_count += 1
+                else:                  fail_count += 1
             except Exception as e:
+                fail_count += 1
                 logger.warning("RSS error %s: %s", src["name"], e)
-    logger.info("RSS: inserted %d new articles", total)
+    logger.info("RSS: inserted %d articles (ok=%d empty=%d fail=%d)",
+                total, ok_count, empty_count, fail_count)
     return total
 
 
-async def _fetch_one(session: AsyncSession, src: dict, http: aiohttp.ClientSession) -> int:
+async def _fetch_one(session: AsyncSession, src: dict, http: aiohttp.ClientSession):
     try:
         async with http.get(src["url"], timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status >= 400:
+                logger.warning("RSS %s HTTP %d", src["name"], resp.status)
+                return 0, "fail"
             content = await resp.text(errors="replace")
     except Exception as e:
-        logger.debug("RSS fetch failed %s: %s", src["name"], e)
-        return 0
+        logger.warning("RSS fetch failed %s: %s", src["name"], e)
+        return 0, "fail"
 
     feed = feedparser.parse(content)
     if not feed.entries:
-        return 0
+        logger.debug("RSS empty feed %s (bozo=%s)", src["name"], feed.get("bozo"))
+        return 0, "empty"
 
     inserted = 0
     for entry in feed.entries[:30]:
@@ -108,4 +120,4 @@ async def _fetch_one(session: AsyncSession, src: dict, http: aiohttp.ClientSessi
         except Exception as e:
             logger.debug("Skip %s: %s", url, e)
     await session.commit()
-    return inserted
+    return inserted, "ok"
