@@ -79,7 +79,8 @@ async def _fetch_one(session: AsyncSession, src: dict, http: aiohttp.ClientSessi
 
     feed = feedparser.parse(content)
     if not feed.entries:
-        logger.debug("RSS empty feed %s (bozo=%s)", src["name"], feed.get("bozo"))
+        preview = content[:120].replace('\n', ' ').strip()
+        logger.warning("RSS 0 entries %s — content preview: %s", src["name"], preview)
         return 0, "empty"
 
     inserted = 0
