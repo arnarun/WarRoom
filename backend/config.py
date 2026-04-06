@@ -7,9 +7,12 @@ _raw_db_url = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://arunaachalam@localhost:5432/warroom"
 )
-# Railway provides postgresql:// — asyncpg needs postgresql+asyncpg://
-if _raw_db_url.startswith("postgresql://"):
-    _raw_db_url = _raw_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+# Normalize URL to postgresql+asyncpg:// for asyncpg
+# Railway/Heroku use postgres:// or postgresql:// — both need to be handled
+if _raw_db_url.startswith("postgres://"):
+    _raw_db_url = "postgresql+asyncpg://" + _raw_db_url[len("postgres://"):]
+elif _raw_db_url.startswith("postgresql://"):
+    _raw_db_url = "postgresql+asyncpg://" + _raw_db_url[len("postgresql://"):]
 DATABASE_URL = _raw_db_url
 
 # Set DATABASE_SSL=true on Railway (internal connections may still need SSL)
