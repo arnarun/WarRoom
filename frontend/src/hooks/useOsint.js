@@ -12,7 +12,7 @@ export function useOsint(filters = {}, interval = 60000) {
         Object.entries(filters).filter(([_, v]) => v != null && v !== '')
       )
       const { data } = await api.get('/osint', { params })
-      setSignals(data)
+      setSignals(Array.isArray(data) ? data : [])
       setError(null)
     } catch (e) {
       setError(e.message)

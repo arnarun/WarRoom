@@ -1,36 +1,29 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import api from '../lib/api'
 
 export function useMarket() {
   const [prices,    setPrices]    = useState([])
   const [connected, setConnected] = useState(false)
   const [error,     setError]     = useState(null)
-  const esRef = useRef(null)
 
   useEffect(() => {
-    function connect() {
-      const sseBase = import.meta.env.VITE_API_URL || ''
-      const es = new EventSource(`${sseBase}/api/stream/prices`)
-      esRef.current = es
-
-      es.onopen = () => {
-        setConnected(true)
-        setError(null)
-      }
-      es.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          if (!data.error) setPrices(data)
-        } catch {}
-      }
-      es.onerror = () => {
+    async function fetchPrices() {
+      try {
+        const { data } = await api.get('/market')
+        if (Array.isArray(data)) {
+          setPrices(data)
+          setConnected(true)
+          setError(null)
+        }
+      } catch (e) {
         setConnected(false)
-        setError('SSE disconnected, retrying…')
-        es.close()
-        setTimeout(connect, 5000)
+        setError('Market data unavailable')
       }
     }
-    connect()
-    return () => esRef.current?.close()
+
+    fetchPrices()
+    const id = setInterval(fetchPrices, 30000)
+    return () => clearInterval(id)
   }, [])
 
   return { prices, connected, error }

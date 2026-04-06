@@ -13,7 +13,7 @@ export function useArticles(filters = {}, interval = 30000) {
         Object.entries(filters).filter(([_, v]) => v != null && v !== '')
       )
       const { data } = await api.get('/articles', { params })
-      setArticles(data)
+      setArticles(Array.isArray(data) ? data : [])
       setLastUpdate(new Date())
       setError(null)
     } catch (e) {
