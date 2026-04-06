@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.env
+
+# Node
+node_modules/
+dist/
+.npm
+
+# OS
+.DS_Store
+*.swp
+
+# Logs
+*.log
+/tmp/
+
+# Secrets
+.env.local
+.env.production
