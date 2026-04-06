@@ -26,6 +26,7 @@ async def fetch_abusech(session: AsyncSession) -> int:
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 data = await resp.json(content_type=None)
+                logger.info("URLhaus status=%s, urls=%d", data.get("query_status"), len(data.get("urls", [])))
             for item in data.get("urls", []):
                 try:
                     await session.execute(

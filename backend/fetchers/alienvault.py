@@ -5,14 +5,19 @@ import re
 from datetime import datetime
 from typing import Optional
 
+import aiohttp
 import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-# Public OTX RSS feed — no authentication required
 OTX_RSS = "https://otx.alienvault.com/rss.xml"
+
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0)",
+    "Accept": "application/rss+xml, application/xml, */*",
+}
 
 
 def _parse_date(entry) -> Optional[datetime]:
@@ -40,7 +45,15 @@ def _infer_severity(title: str, desc: str) -> str:
 async def fetch_alienvault(session: AsyncSession) -> int:
     inserted = 0
     try:
-        feed = feedparser.parse(OTX_RSS)
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
+            async with http.get(OTX_RSS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                logger.info("AlienVault OTX HTTP %d", resp.status)
+                content = await resp.text(errors="replace")
+
+        feed = feedparser.parse(content)
+        logger.info("AlienVault OTX: %d entries in feed", len(feed.entries))
+
         for entry in feed.entries[:30]:
             title = getattr(entry, "title", "").strip()
             if not title:
@@ -60,13 +73,7 @@ async def fetch_alienvault(session: AsyncSession) -> int:
                           ('alienvault', 'threat-intel', :severity, :title, :desc, :url, :pub)
                         ON CONFLICT DO NOTHING
                     """),
-                    {
-                        "severity": severity,
-                        "title":    title,
-                        "desc":     desc,
-                        "url":      url,
-                        "pub":      pub,
-                    },
+                    {"severity": severity, "title": title, "desc": desc, "url": url, "pub": pub},
                 )
                 inserted += 1
             except Exception as e:

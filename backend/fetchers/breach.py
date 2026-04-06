@@ -5,29 +5,30 @@ import re
 from datetime import datetime
 from typing import Optional
 
+import aiohttp
 import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0)",
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+}
+
 BREACH_FEEDS = [
-    # DataBreaches.net — comprehensive breach reporting RSS
-    ("https://www.databreaches.net/feed/", "breach", "DataBreaches.net", None),
-    # HaveIBeenPwned latest breach notifications (public Atom feed)
-    ("https://feeds.feedburner.com/HaveIBeenPwnedLatestBreaches", "breach", "haveibeenpwned", None),
+    ("https://www.databreaches.net/feed/",                         "breach",  "DataBreaches.net", None),
+    ("https://feeds.feedburner.com/HaveIBeenPwnedLatestBreaches",  "breach",  "haveibeenpwned",   None),
 ]
 
 PEOPLE_FEEDS = [
-    # Reuters People news
-    ("https://feeds.reuters.com/reuters/peopleNews", "people", "Reuters People", None),
-    # TechCrunch founder/executive category
-    ("https://techcrunch.com/category/startups/feed/", "people", "TechCrunch", "US"),
+    ("https://techcrunch.com/category/startups/feed/",             "people",  "TechCrunch",       "US"),
+    ("https://feeds.feedburner.com/venturebeat/SZYF",              "people",  "VentureBeat",      "US"),
 ]
 
 THREAT_ACTOR_FEEDS = [
-    # CISA named-actor advisories (already covered in cisa.py but we mirror here for type=threat-actor)
-    ("https://www.cisa.gov/uscert/ncas/alerts.xml", "threat-actor", "cisa", "US"),
+    ("https://www.cisa.gov/uscert/ncas/alerts.xml",                "threat-actor", "cisa",        "US"),
 ]
 
 
@@ -48,6 +49,7 @@ def _clean(text_val: str) -> str:
 
 async def _ingest_feed(
     session: AsyncSession,
+    http: aiohttp.ClientSession,
     feed_url: str,
     signal_type: str,
     source_name: str,
@@ -56,16 +58,18 @@ async def _ingest_feed(
 ) -> int:
     inserted = 0
     try:
-        feed = feedparser.parse(feed_url)
+        async with http.get(feed_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            content = await resp.text(errors="replace")
+        feed = feedparser.parse(content)
+        logger.debug("Breach feed %s: %d entries", source_name, len(feed.entries))
+
         for entry in feed.entries[:limit]:
             title = getattr(entry, "title", "").strip()
             if not title:
                 continue
-            desc = _clean(getattr(entry, "summary", "") or "")
-            url = getattr(entry, "link", None)
-            pub = _parse_date(entry)
-
-            # Severity: breaches are generally high, people news is low
+            desc  = _clean(getattr(entry, "summary", "") or "")
+            url   = getattr(entry, "link", None)
+            pub   = _parse_date(entry)
             severity = "high" if signal_type == "breach" else "low"
 
             try:
@@ -98,8 +102,10 @@ async def _ingest_feed(
 
 async def fetch_breach(session: AsyncSession) -> int:
     total = 0
-    for feed_url, signal_type, source_name, country in BREACH_FEEDS + PEOPLE_FEEDS:
-        total += await _ingest_feed(session, feed_url, signal_type, source_name, country)
+    connector = aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
+        for feed_url, signal_type, source_name, country in BREACH_FEEDS + PEOPLE_FEEDS + THREAT_ACTOR_FEEDS:
+            total += await _ingest_feed(session, http, feed_url, signal_type, source_name, country)
     await session.commit()
     logger.info("Breach/People: inserted %d signals", total)
     return total

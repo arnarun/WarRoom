@@ -67,40 +67,48 @@ def _infer_severity(title: str) -> str:
 
 async def _ingest_clearnet(session: AsyncSession) -> int:
     inserted = 0
-    for feed_url, source_name in CLEARNET_FEEDS:
-        try:
-            feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:20]:
-                title = getattr(entry, "title", "").strip()
-                if not title:
-                    continue
-                desc = _clean(getattr(entry, "summary", "") or "")
-                url = getattr(entry, "link", None)
-                pub = _parse_date(entry)
-
-                try:
-                    await session.execute(
-                        text("""
-                            INSERT INTO osint_signals
-                              (source, type, severity, title, description, url, published_at)
-                            VALUES
-                              (:source, 'darkweb', :severity, :title, :desc, :url, :pub)
-                            ON CONFLICT DO NOTHING
-                        """),
-                        {
-                            "source":   "darkweb-news",
-                            "severity": _infer_severity(title),
-                            "title":    f"[{source_name}] {title}",
-                            "desc":     desc,
-                            "url":      url,
-                            "pub":      pub,
-                        },
-                    )
-                    inserted += 1
-                except Exception as e:
-                    logger.debug("Darkweb skip %s: %s", source_name, e)
-        except Exception as e:
-            logger.warning("Darkweb clearnet feed error %s: %s", feed_url, e)
+    connector = aiohttp.TCPConnector(ssl=False)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0)",
+        "Accept": "application/rss+xml, application/xml, */*",
+    }
+    async with aiohttp.ClientSession(connector=connector, headers=headers) as http:
+        for feed_url, source_name in CLEARNET_FEEDS:
+            try:
+                async with http.get(feed_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    content = await resp.text(errors="replace")
+                feed = feedparser.parse(content)
+                logger.debug("Darkweb feed %s: %d entries", source_name, len(feed.entries))
+                for entry in feed.entries[:20]:
+                    title = getattr(entry, "title", "").strip()
+                    if not title:
+                        continue
+                    desc = _clean(getattr(entry, "summary", "") or "")
+                    url  = getattr(entry, "link", None)
+                    pub  = _parse_date(entry)
+                    try:
+                        await session.execute(
+                            text("""
+                                INSERT INTO osint_signals
+                                  (source, type, severity, title, description, url, published_at)
+                                VALUES
+                                  (:source, 'darkweb', :severity, :title, :desc, :url, :pub)
+                                ON CONFLICT DO NOTHING
+                            """),
+                            {
+                                "source":   "darkweb-news",
+                                "severity": _infer_severity(title),
+                                "title":    f"[{source_name}] {title}",
+                                "desc":     desc,
+                                "url":      url,
+                                "pub":      pub,
+                            },
+                        )
+                        inserted += 1
+                    except Exception as e:
+                        logger.debug("Darkweb skip %s: %s", source_name, e)
+            except Exception as e:
+                logger.warning("Darkweb clearnet feed error %s: %s", feed_url, e)
     return inserted
 
 

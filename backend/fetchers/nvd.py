@@ -61,6 +61,8 @@ async def fetch_nvd(session: AsyncSession) -> int:
                     logger.warning("NVD API returned %d", resp.status)
                     return 0
                 data = await resp.json()
+                logger.info("NVD response: totalResults=%s, returned=%s",
+                            data.get("totalResults"), data.get("resultsPerPage"))
     except Exception as e:
         logger.warning("NVD fetch error: %s", e)
         return 0
