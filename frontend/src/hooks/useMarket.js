@@ -8,7 +8,8 @@ export function useMarket() {
 
   useEffect(() => {
     function connect() {
-      const es = new EventSource('/api/stream/prices')
+      const sseBase = import.meta.env.VITE_API_URL || ''
+      const es = new EventSource(`${sseBase}/api/stream/prices`)
       esRef.current = es
 
       es.onopen = () => {
