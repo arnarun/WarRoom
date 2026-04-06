@@ -7,7 +7,7 @@ export function useHotTopics(hours = 6, interval = 180000) {
 
   const fetch = useCallback(() => {
     api.get('/articles/hot', { params: { hours, limit: 60 } })
-      .then(r => { setTopics(r.data); setLoading(false) })
+      .then(r => { setTopics(Array.isArray(r.data) ? r.data : []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [hours])
 

@@ -271,13 +271,13 @@ function SocialView() {
   const [posts, setPosts]       = useState([])
   const [loading, setLoading]   = useState(true)
 
-  useState(() => {
+  useEffect(() => {
     import('./lib/api').then(({ default: api }) => {
       api.get('/social', { params: { limit: 100 } })
-        .then(r => { setPosts(r.data); setLoading(false) })
+        .then(r => { setPosts(Array.isArray(r.data) ? r.data : []); setLoading(false) })
         .catch(() => setLoading(false))
     })
-  })
+  }, [])
 
   const platforms = ['hackernews', 'reddit', 'stocktwits']
   const filtered = posts.filter(p => p.platform === platform)
