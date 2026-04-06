@@ -26,7 +26,8 @@ async def _get_json(session: aiohttp.ClientSession, url: str):
 
 async def fetch_hackernews(db: AsyncSession) -> int:
     inserted = 0
-    async with aiohttp.ClientSession() as http:
+    connector = aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as http:
         for feed_name, feed_url in FEEDS.items():
             try:
                 ids = await _get_json(http, feed_url)

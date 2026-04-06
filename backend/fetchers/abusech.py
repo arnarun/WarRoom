@@ -17,7 +17,7 @@ MALWAREBAZAAR_API = "https://mb-api.abuse.ch/api/v1/"
 async def fetch_abusech(session: AsyncSession) -> int:
     inserted = 0
 
-    async with aiohttp.ClientSession() as http:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
         # --- URLhaus ---
         try:
             async with http.post(

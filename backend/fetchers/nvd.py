@@ -50,7 +50,7 @@ async def fetch_nvd(session: AsyncSession) -> int:
     }
 
     try:
-        async with aiohttp.ClientSession() as http:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
             async with http.get(
                 NVD_URL,
                 params=params,

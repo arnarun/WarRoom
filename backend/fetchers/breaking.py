@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import aiohttp
 import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 SOURCES_PATH = Path(__file__).parent.parent / "sources.json"
+
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0; +https://github.com/warroom)",
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+}
 
 
 def _parse_date(entry) -> Optional[datetime]:
@@ -42,47 +48,50 @@ async def fetch_breaking_rss(session: AsyncSession) -> int:
     breaking = [s for s in sources if s.get("breaking")]
     total = 0
 
-    for src in breaking:
-        try:
-            feed = feedparser.parse(src["url"])
-            for entry in feed.entries[:10]:   # only latest 10 per source
-                url   = getattr(entry, "link", None)
-                title = getattr(entry, "title", "").strip()
-                if not url or not title:
-                    continue
-                summary = getattr(entry, "summary", None) or getattr(entry, "description", None)
-                if summary:
-                    summary = re.sub(r"<[^>]+>", "", summary).strip()[:2000]
-
-                try:
-                    await session.execute(
-                        text("""
-                            INSERT INTO articles
-                              (source, category, region, country, title, summary,
-                               url, image_url, published_at, tags)
-                            VALUES
-                              (:source, :category, :region, :country, :title, :summary,
-                               :url, :image_url, :published_at, :tags)
-                            ON CONFLICT (url) DO NOTHING
-                        """),
-                        {
-                            "source":       src["name"],
-                            "category":     src.get("category"),
-                            "region":       src.get("region"),
-                            "country":      src.get("country"),
-                            "title":        title,
-                            "summary":      summary,
-                            "url":          url,
-                            "image_url":    _get_image(entry),
-                            "published_at": _parse_date(entry),
-                            "tags":         src.get("tags"),
-                        },
-                    )
-                    total += 1
-                except Exception as e:
-                    logger.debug("Breaking skip %s: %s", url, e)
-        except Exception as e:
-            logger.warning("Breaking RSS error %s: %s", src["name"], e)
+    connector = aiohttp.TCPConnector(ssl=False, limit=10)
+    async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
+        for src in breaking:
+            try:
+                async with http.get(src["url"], timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    content = await resp.text(errors="replace")
+                feed = feedparser.parse(content)
+                for entry in feed.entries[:10]:
+                    url   = getattr(entry, "link", None)
+                    title = getattr(entry, "title", "").strip()
+                    if not url or not title:
+                        continue
+                    summary = getattr(entry, "summary", None) or getattr(entry, "description", None)
+                    if summary:
+                        summary = re.sub(r"<[^>]+>", "", summary).strip()[:2000]
+                    try:
+                        await session.execute(
+                            text("""
+                                INSERT INTO articles
+                                  (source, category, region, country, title, summary,
+                                   url, image_url, published_at, tags)
+                                VALUES
+                                  (:source, :category, :region, :country, :title, :summary,
+                                   :url, :image_url, :published_at, :tags)
+                                ON CONFLICT (url) DO NOTHING
+                            """),
+                            {
+                                "source":       src["name"],
+                                "category":     src.get("category"),
+                                "region":       src.get("region"),
+                                "country":      src.get("country"),
+                                "title":        title,
+                                "summary":      summary,
+                                "url":          url,
+                                "image_url":    _get_image(entry),
+                                "published_at": _parse_date(entry),
+                                "tags":         src.get("tags"),
+                            },
+                        )
+                        total += 1
+                    except Exception as e:
+                        logger.debug("Breaking skip %s: %s", url, e)
+            except Exception as e:
+                logger.warning("Breaking RSS error %s: %s", src["name"], e)
 
     await session.commit()
     logger.info("Breaking RSS: checked %d sources, inserted %d articles", len(breaking), total)

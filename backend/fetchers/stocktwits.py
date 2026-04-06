@@ -15,7 +15,7 @@ ST_STREAM   = "https://api.stocktwits.com/api/2/streams/symbol/{sym}.json"
 
 async def fetch_stocktwits(session: AsyncSession) -> int:
     inserted = 0
-    async with aiohttp.ClientSession() as http:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
         for sym in SYMBOLS:
             try:
                 url = ST_STREAM.format(sym=sym)

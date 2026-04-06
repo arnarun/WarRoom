@@ -2,10 +2,12 @@
 from __future__ import annotations
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import aiohttp
 import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 SOURCES_PATH = Path(__file__).parent.parent / "sources.json"
+
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0; +https://github.com/warroom)",
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+}
 
 
 def _parse_date(entry) -> Optional[datetime]:
@@ -27,7 +34,6 @@ def _parse_date(entry) -> Optional[datetime]:
 
 
 def _get_image(entry) -> Optional[str]:
-    # media:thumbnail or enclosure
     if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
         return entry.media_thumbnail[0].get("url")
     if hasattr(entry, "enclosures") and entry.enclosures:
@@ -40,18 +46,30 @@ def _get_image(entry) -> Optional[str]:
 async def fetch_all_rss(session: AsyncSession) -> int:
     sources = json.loads(SOURCES_PATH.read_text())
     total = 0
-    for src in sources:
-        try:
-            count = await _fetch_one(session, src)
-            total += count
-        except Exception as e:
-            logger.warning("RSS error %s: %s", src["name"], e)
+    connector = aiohttp.TCPConnector(ssl=False, limit=20)
+    async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
+        for src in sources:
+            try:
+                count = await _fetch_one(session, src, http)
+                total += count
+            except Exception as e:
+                logger.warning("RSS error %s: %s", src["name"], e)
     logger.info("RSS: inserted %d new articles", total)
     return total
 
 
-async def _fetch_one(session: AsyncSession, src: dict) -> int:
-    feed = feedparser.parse(src["url"])
+async def _fetch_one(session: AsyncSession, src: dict, http: aiohttp.ClientSession) -> int:
+    try:
+        async with http.get(src["url"], timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            content = await resp.text(errors="replace")
+    except Exception as e:
+        logger.debug("RSS fetch failed %s: %s", src["name"], e)
+        return 0
+
+    feed = feedparser.parse(content)
+    if not feed.entries:
+        return 0
+
     inserted = 0
     for entry in feed.entries[:30]:
         url = getattr(entry, "link", None)
@@ -62,8 +80,6 @@ async def _fetch_one(session: AsyncSession, src: dict) -> int:
             continue
         summary = getattr(entry, "summary", None) or getattr(entry, "description", None)
         if summary:
-            # strip HTML tags crudely
-            import re
             summary = re.sub(r"<[^>]+>", "", summary).strip()[:2000]
 
         try:

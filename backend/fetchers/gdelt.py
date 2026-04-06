@@ -20,7 +20,7 @@ QUERIES = [
 
 async def fetch_gdelt(session: AsyncSession) -> int:
     inserted = 0
-    async with aiohttp.ClientSession() as http:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
         for q in QUERIES:
             try:
                 params = {
