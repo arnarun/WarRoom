@@ -12,6 +12,7 @@ export function useArticles(filters = {}, interval = 30000) {
       const params = Object.fromEntries(
         Object.entries(filters).filter(([_, v]) => v != null && v !== '')
       )
+      if (!params.limit) params.limit = 500
       const { data } = await api.get('/articles', { params })
       setArticles(Array.isArray(data) ? data : [])
       setLastUpdate(new Date())

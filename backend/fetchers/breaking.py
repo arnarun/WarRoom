@@ -7,22 +7,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import aiohttp
 import feedparser
+from curl_cffi.requests import AsyncSession
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession as DBSession
 
 logger = logging.getLogger(__name__)
 
 SOURCES_PATH = Path(__file__).parent.parent / "sources.json"
-
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Cache-Control": "no-cache",
-}
 
 
 def _parse_date(entry) -> Optional[datetime]:
@@ -46,19 +38,19 @@ def _get_image(entry) -> Optional[str]:
     return None
 
 
-async def fetch_breaking_rss(session: AsyncSession) -> int:
+async def fetch_breaking_rss(session: DBSession) -> int:
     sources = json.loads(SOURCES_PATH.read_text())
     breaking = [s for s in sources if s.get("breaking")]
     total = 0
 
-    connector = aiohttp.TCPConnector(ssl=False, limit=10)
-    async with aiohttp.ClientSession(
-        connector=connector, headers=_HEADERS, max_field_size=16384
-    ) as http:
+    async with AsyncSession(impersonate="chrome110") as http:
         for src in breaking:
             try:
-                async with http.get(src["url"], timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    content = await resp.text(errors="replace")
+                resp = await http.get(src["url"], timeout=15)
+                if resp.status_code >= 400:
+                    logger.warning("Breaking RSS error %s: HTTP %d", src["name"], resp.status_code)
+                    continue
+                content = resp.text
                 feed = feedparser.parse(content)
                 for entry in feed.entries[:10]:
                     url   = getattr(entry, "link", None)

@@ -16,12 +16,16 @@ async def get_articles(
     country:  Optional[str] = Query(None),
     source:   Optional[str] = Query(None),
     q:        Optional[str] = Query(None),
-    limit:    int           = Query(50, le=200),
+    hours:    Optional[int] = Query(None, le=168),
+    limit:    int           = Query(500, le=1000),
     offset:   int           = Query(0),
     db:       AsyncSession  = Depends(get_db),
 ):
     stmt = select(Article).order_by(Article.published_at.desc().nulls_last())
 
+    if hours:
+        since = datetime.utcnow() - timedelta(hours=hours)
+        stmt = stmt.where(Article.published_at >= since)
     if category:
         stmt = stmt.where(Article.category == category)
     if region:
