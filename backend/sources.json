@@ -59,7 +59,7 @@
   {"name": "NDTV",                    "url": "https://feeds.feedburner.com/NDTV-LatestNews",               "category": "politics",    "region": "asia",   "country": "India",     "breaking": true},
   {"name": "The Hindu",               "url": "https://www.thehindu.com/feeder/default.rss",                "category": "politics",    "region": "asia",   "country": "India"},
   {"name": "Economic Times",          "url": "https://economictimes.indiatimes.com/rssfeedstopstories.cms","category": "business",    "region": "asia",   "country": "India"},
-  {"name": "Hindustan Times",         "url": "https://news.google.com/rss/search?q=site:hindustantimes.com&hl=en-US&gl=US&ceid=US:en", "category": "politics", "region": "asia", "country": "India"},
+  {"name": "Hindustan Times",         "url": "https://www.hindustantimes.com/rss/topnews/rssfeed.xml",     "category": "politics",    "region": "asia",   "country": "India"},
   {"name": "Indian Express",          "url": "https://indianexpress.com/feed/",                            "category": "politics",    "region": "asia",   "country": "India"},
   {"name": "Inc42 India Startups",    "url": "https://inc42.com/feed/",                                    "category": "startups",    "region": "asia",   "country": "India"},
   {"name": "The Guardian UK",         "url": "https://www.theguardian.com/uk/rss",                         "category": "politics",    "region": "eu",     "country": "UK"},
@@ -103,7 +103,7 @@
   {"name": "UN News",                 "url": "https://news.un.org/feed/subscribe/en/news/all/rss.xml",     "category": "geopolitics", "region": "global",                         "breaking": true},
   {"name": "Space.com",               "url": "https://www.space.com/feeds/all",                            "category": "science",     "region": "global"},
   {"name": "Phys.org",                "url": "https://phys.org/rss-feed/",                                 "category": "science",     "region": "global"},
-  {"name": "Hacker News Blog",        "url": "https://news.ycombinator.com/rss",                           "category": "technology",  "region": "us",     "country": "US"},
+  {"name": "Hacker News Best",        "url": "https://news.ycombinator.com/bestcomments.rss",              "category": "technology",  "region": "us",     "country": "US"},
   {"name": "TechRepublic",            "url": "https://www.techrepublic.com/rssfeeds/articles/",            "category": "technology",  "region": "us",     "country": "US"},
   {"name": "ZDNet",                   "url": "https://www.zdnet.com/news/rss.xml",                         "category": "technology",  "region": "global", "country": "US"}
 ]
