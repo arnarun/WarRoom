@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 SOURCES_PATH = Path(__file__).parent.parent / "sources.json"
 
 _HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0; +https://github.com/warroom)",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
 }
 
 
