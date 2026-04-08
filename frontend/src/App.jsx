@@ -20,12 +20,19 @@ export default function App() {
   const { articles, loading: artLoading, lastUpdate } = useArticles(filters, 30000)
   const { signals,  loading: osintLoading }            = useOsint({}, 60000)
 
-  // Group articles by category for multi-column layout
+  // Group articles by category for multi-column layout, newest first within each
   const grouped = {}
   for (const a of articles) {
     const cat = a.category || 'other'
     if (!grouped[cat]) grouped[cat] = []
     grouped[cat].push(a)
+  }
+  for (const cat of Object.keys(grouped)) {
+    grouped[cat].sort((a, b) => {
+      if (!a.published_at) return 1
+      if (!b.published_at) return -1
+      return new Date(b.published_at) - new Date(a.published_at)
+    })
   }
 
   const CATEGORY_ICONS = {
