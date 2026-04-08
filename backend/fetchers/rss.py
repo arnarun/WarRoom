@@ -50,7 +50,9 @@ async def fetch_all_rss(session: AsyncSession) -> int:
     fail_count = 0
     empty_count = 0
     connector = aiohttp.TCPConnector(ssl=False, limit=20)
-    async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
+    async with aiohttp.ClientSession(
+        connector=connector, headers=_HEADERS, max_field_size=16384
+    ) as http:
         for src in sources:
             try:
                 count, status = await _fetch_one(session, src, http)

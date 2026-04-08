@@ -49,7 +49,9 @@ async def fetch_breaking_rss(session: AsyncSession) -> int:
     total = 0
 
     connector = aiohttp.TCPConnector(ssl=False, limit=10)
-    async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
+    async with aiohttp.ClientSession(
+        connector=connector, headers=_HEADERS, max_field_size=16384
+    ) as http:
         for src in breaking:
             try:
                 async with http.get(src["url"], timeout=aiohttp.ClientTimeout(total=15)) as resp:
