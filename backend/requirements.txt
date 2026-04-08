@@ -10,3 +10,4 @@ yfinance==1.2.0
 praw==7.8.1
 python-dotenv==1.0.1
 aiohttp-socks==0.9.0
+brotli==1.1.0
