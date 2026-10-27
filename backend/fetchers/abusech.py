@@ -8,6 +8,8 @@ import aiohttp
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 URLHAUS_API       = "https://urlhaus-api.abuse.ch/v1/urls/recent/"
@@ -17,7 +19,7 @@ MALWAREBAZAAR_API = "https://mb-api.abuse.ch/api/v1/"
 async def fetch_abusech(session: AsyncSession) -> int:
     inserted = 0
 
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT)) as http:
         # --- URLhaus ---
         try:
             async with http.post(
@@ -35,6 +37,7 @@ async def fetch_abusech(session: AsyncSession) -> int:
                               (source, type, severity, title, description, url, published_at)
                             VALUES
                               ('urlhaus', 'phishing', 'high', :title, :desc, :url, :pub)
+                            ON CONFLICT DO NOTHING
                         """),
                         {
                             "title": f"Malicious URL: {item.get('url', '')[:200]}",
@@ -65,6 +68,7 @@ async def fetch_abusech(session: AsyncSession) -> int:
                               (source, type, severity, title, description, url, published_at)
                             VALUES
                               ('malwarebazaar', 'malware', 'high', :title, :desc, :url, :pub)
+                            ON CONFLICT DO NOTHING
                         """),
                         {
                             "title": f"Malware Sample: {item.get('sha256_hash', '')[:16]}... ({item.get('file_name', '')})",

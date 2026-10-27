@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models import Article
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import timedelta
+from fetchers.common import utcnow
 
 router = APIRouter()
 
@@ -15,16 +16,16 @@ async def get_articles(
     region:   Optional[str] = Query(None),
     country:  Optional[str] = Query(None),
     source:   Optional[str] = Query(None),
-    q:        Optional[str] = Query(None),
-    hours:    Optional[int] = Query(None, le=168),
-    limit:    int           = Query(500, le=1000),
-    offset:   int           = Query(0),
+    q:        Optional[str] = Query(None, max_length=200),
+    hours:    Optional[int] = Query(None, ge=1, le=168),
+    limit:    int           = Query(500, ge=1, le=1000),
+    offset:   int           = Query(0, ge=0),
     db:       AsyncSession  = Depends(get_db),
 ):
     stmt = select(Article).order_by(Article.published_at.desc().nulls_last())
 
     if hours:
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = utcnow() - timedelta(hours=hours)
         stmt = stmt.where(Article.published_at >= since)
     if category:
         stmt = stmt.where(Article.category == category)
@@ -54,8 +55,8 @@ async def get_articles(
             "summary":      r.summary,
             "url":          r.url,
             "image_url":    r.image_url,
-            "published_at": r.published_at.isoformat() if r.published_at else None,
-            "fetched_at":   r.fetched_at.isoformat()   if r.fetched_at   else None,
+            "published_at": (r.published_at.isoformat() + "Z") if r.published_at else None,
+            "fetched_at":   (r.fetched_at.isoformat()   + "Z") if r.fetched_at   else None,
             "tags":         r.tags or [],
         }
         for r in rows
@@ -64,12 +65,12 @@ async def get_articles(
 
 @router.get("/articles/hot")
 async def get_hot_articles(
-    hours: int           = Query(6, le=24),
-    limit: int           = Query(50, le=100),
+    hours: int           = Query(6, ge=1, le=24),
+    limit: int           = Query(50, ge=1, le=100),
     db:    AsyncSession  = Depends(get_db),
 ):
     """Most recent articles from the last N hours — used for the hot topics banner."""
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = utcnow() - timedelta(hours=hours)
     stmt  = (
         select(Article)
         .where(Article.published_at >= since)
@@ -88,7 +89,7 @@ async def get_hot_articles(
             "summary":      r.summary,
             "url":          r.url,
             "image_url":    r.image_url,
-            "published_at": r.published_at.isoformat() if r.published_at else None,
+            "published_at": (r.published_at.isoformat() + "Z") if r.published_at else None,
         }
         for r in rows
     ]

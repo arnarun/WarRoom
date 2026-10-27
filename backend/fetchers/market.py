@@ -1,4 +1,5 @@
 """Market data fetcher — CoinGecko (crypto) + yfinance history() (stocks/ETFs/forex)."""
+import asyncio
 import logging
 from datetime import datetime
 
@@ -6,6 +7,8 @@ import yfinance as yf
 from pycoingecko import CoinGeckoAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from fetchers.common import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +42,8 @@ STOCK_SYMBOLS = {
 
 async def fetch_crypto(session: AsyncSession) -> int:
     try:
-        data = cg.get_coins_markets(
+        data = await asyncio.to_thread(
+            cg.get_coins_markets,
             vs_currency="usd",
             ids=",".join(CRYPTO_IDS),
             price_change_percentage="1h,24h,7d",
@@ -75,7 +79,7 @@ async def fetch_crypto(session: AsyncSession) -> int:
                     "ch7d":       coin.get("price_change_percentage_7d_in_currency"),
                     "vol":        coin.get("total_volume"),
                     "mcap":       coin.get("market_cap"),
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": utcnow(),
                 },
             )
             inserted += 1
@@ -90,7 +94,7 @@ async def fetch_stocks(session: AsyncSession) -> int:
     inserted = 0
     for symbol, (name, asset_type) in STOCK_SYMBOLS.items():
         try:
-            hist = yf.Ticker(symbol).history(period="5d", interval="1d")
+            hist = await asyncio.to_thread(yf.Ticker(symbol).history, period="5d", interval="1d")
             if hist.empty:
                 logger.warning("No history data for %s", symbol)
                 continue
@@ -118,7 +122,7 @@ async def fetch_stocks(session: AsyncSession) -> int:
                     "name":       name,
                     "price":      price,
                     "ch24h":      change_24h,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": utcnow(),
                 },
             )
             inserted += 1

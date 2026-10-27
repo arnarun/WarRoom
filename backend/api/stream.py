@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 from models import MarketPrice
+from api.market import _f
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,8 +29,8 @@ async def _price_generator():
                         "symbol":     r.symbol,
                         "type":       r.type,
                         "name":       r.name,
-                        "price":      float(r.price),
-                        "change_24h": r.change_24h,
+                        "price":      _f(r.price),
+                        "change_24h": _f(r.change_24h),
                         "updated_at": r.updated_at.isoformat() if r.updated_at else None,
                     }
                     for r in rows
@@ -37,7 +38,7 @@ async def _price_generator():
                 yield f"data: {json.dumps(prices)}\n\n"
         except Exception as e:
             logger.error("SSE error: %s", e)
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': 'unavailable'})}\n\n"
 
         await asyncio.sleep(30)
 

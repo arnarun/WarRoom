@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from 'date-fns'
+import { safeUrl } from '../lib/storage'
 
 const PLATFORM_STYLES = {
   reddit:      { label: 'r/', color: 'text-orange-400' },
@@ -22,7 +23,7 @@ export default function SocialCard({ post }) {
 
   return (
     <a
-      href={post.url || '#'}
+      href={safeUrl(post.url)}
       target="_blank"
       rel="noopener noreferrer"
       className="block p-3 border border-gray-800 rounded bg-gray-900 hover:border-gray-600 transition-colors"

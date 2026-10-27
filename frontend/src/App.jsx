@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import MarketTicker  from './components/MarketTicker'
 import FilterBar     from './components/FilterBar'
 import FeedColumn    from './components/FeedColumn'
@@ -8,30 +8,57 @@ import SocialCard    from './components/SocialCard'
 import MarketPanel   from './components/MarketPanel'
 import WorldClock        from './components/WorldClock'
 import HotTopicsBanner  from './components/HotTopicsBanner'
+import StatusView, { HealthDot } from './components/StatusView'
 import { useArticles } from './hooks/useArticles'
 import { useOsint }    from './hooks/useOsint'
+import { useStatus }   from './hooks/useStatus'
+import { useBookmarkStore, BookmarkContext } from './hooks/useBookmarks'
+import { load, save } from './lib/storage'
+import api from './lib/api'
 
-const VIEWS = ['feed', 'market', 'osint', 'social']
+const VIEWS = ['feed', 'market', 'osint', 'social', 'saved', 'status']
+
+const SEEN_KEY = 'warroom.lastSeen'
 
 export default function App() {
   const [view,    setView]    = useState('feed')
   const [filters, setFilters] = useState({ category: '', region: '', country: '', q: '' })
 
   const { articles, loading: artLoading, lastUpdate } = useArticles(filters, 30000)
-  const { signals,  loading: osintLoading }            = useOsint({}, 60000)
+  const { signals,  loading: osintLoading }            = useOsint({ limit: 300 }, 60000)
+  const status    = useStatus(60000)
+  const bookmarks = useBookmarkStore()
+
+  // Articles fetched after the previous visit (or the last "mark read") get a NEW badge
+  const [seenAt, setSeenAt] = useState(() => load(SEEN_KEY, null))
+  useEffect(() => {
+    const mark = () => save(SEEN_KEY, new Date().toISOString())
+    window.addEventListener('beforeunload', mark)
+    return () => window.removeEventListener('beforeunload', mark)
+  }, [])
+  const isNew = a => !!seenAt && !!a.fetched_at && a.fetched_at > seenAt
+  const newCount = useMemo(() => (seenAt ? articles.filter(isNew).length : 0), [articles, seenAt])
+  const markRead = () => {
+    const now = new Date().toISOString()
+    save(SEEN_KEY, now)
+    setSeenAt(now)
+  }
 
   // Group articles by category for multi-column layout, newest first within each
+  const now = Date.now()
   const grouped = {}
   for (const a of articles) {
+    // Skip future-dated articles (event announcements etc.) more than 12h ahead
+    if (a.published_at && new Date(a.published_at).getTime() > now + 12 * 3600 * 1000) continue
     const cat = a.category || 'other'
     if (!grouped[cat]) grouped[cat] = []
     grouped[cat].push(a)
   }
   for (const cat of Object.keys(grouped)) {
     grouped[cat].sort((a, b) => {
-      if (!a.published_at) return 1
-      if (!b.published_at) return -1
-      return new Date(b.published_at) - new Date(a.published_at)
+      const ta = a.published_at ? new Date(a.published_at).getTime() : (a.fetched_at ? new Date(a.fetched_at).getTime() : 0)
+      const tb = b.published_at ? new Date(b.published_at).getTime() : (b.fetched_at ? new Date(b.fetched_at).getTime() : 0)
+      return tb - ta
     })
   }
 
@@ -52,6 +79,7 @@ export default function App() {
   }
 
   return (
+    <BookmarkContext.Provider value={bookmarks}>
     <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
       {/* Top bar */}
       <header className="flex items-center gap-4 px-4 py-2 bg-gray-900 border-b border-gray-800">
@@ -75,7 +103,7 @@ export default function App() {
                   : 'text-gray-500 hover:text-white hover:bg-gray-800'
                 }`}
             >
-              {v}
+              {v === 'saved' && bookmarks.items.length > 0 ? `saved (${bookmarks.items.length})` : v}
             </button>
           ))}
         </nav>
@@ -89,6 +117,8 @@ export default function App() {
         <FilterBar
           filters={{ ...filters, lastUpdate }}
           onChange={f => setFilters({ category: f.category, region: f.region, country: f.country || '', q: f.q })}
+          newCount={newCount}
+          onMarkRead={markRead}
         />
       )}
 
@@ -116,7 +146,7 @@ export default function App() {
                 count={articles.length}
                 className="flex-1 max-w-none"
               >
-                {articles.map(a => <ArticleCard key={a.id} article={a} />)}
+                {articles.map(a => <ArticleCard key={a.id} article={a} isNew={isNew(a)} />)}
               </FeedColumn>
             ) : (
               /* Multi-column: one per category */
@@ -128,7 +158,7 @@ export default function App() {
                   count={arts.length}
                   className="border-r border-gray-800"
                 >
-                  {arts.slice(0, 40).map(a => <ArticleCard key={a.id} article={a} />)}
+                  {arts.slice(0, 40).map(a => <ArticleCard key={a.id} article={a} isNew={isNew(a)} />)}
                 </FeedColumn>
               ))
             )}
@@ -176,14 +206,64 @@ export default function App() {
           <SocialView />
         )}
 
+        {/* SAVED VIEW */}
+        {view === 'saved' && (
+          <SavedView bookmarks={bookmarks} />
+        )}
+
+        {/* STATUS VIEW */}
+        {view === 'status' && (
+          <StatusView {...status} />
+        )}
+
       </main>
 
       {/* Status bar */}
       <footer className="flex items-center gap-4 px-4 py-1 bg-gray-900 border-t border-gray-800 text-[10px] text-gray-600">
         <span>{articles.length} articles</span>
         <span>{signals.length} signals</span>
-        <span className="ml-auto">WarRoom v1.0 — {new Date().toLocaleTimeString()}</span>
+        <button
+          type="button"
+          onClick={() => setView('status')}
+          className="ml-auto flex items-center gap-1.5 hover:text-gray-300"
+          title="System status"
+        >
+          <HealthDot health={status.health} />
+          <span className="uppercase">{status.health}</span>
+        </button>
+        <span>WarRoom v{status.status?.version || '1.1'}</span>
       </footer>
+    </div>
+    </BookmarkContext.Provider>
+  )
+}
+
+function SavedView({ bookmarks }) {
+  const { items, clear } = bookmarks
+  return (
+    <div className="h-full overflow-y-auto p-4">
+      <div className="max-w-2xl mx-auto space-y-2">
+        <div className="flex items-center mb-2">
+          <h2 className="text-xs font-bold uppercase text-brand tracking-wider">
+            Saved articles ({items.length})
+          </h2>
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { if (window.confirm('Remove all saved articles?')) clear() }}
+              className="ml-auto text-[10px] uppercase text-gray-500 hover:text-red-400"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        {items.length === 0 && (
+          <p className="text-gray-600 text-xs text-center py-8">
+            Nothing saved yet. Hover an article and click ☆ to keep it here.
+          </p>
+        )}
+        {items.map(a => <ArticleCard key={a.url} article={a} />)}
+      </div>
     </div>
   )
 }
@@ -279,11 +359,10 @@ function SocialView() {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
-    import('./lib/api').then(({ default: api }) => {
-      api.get('/social', { params: { limit: 100 } })
-        .then(r => { setPosts(Array.isArray(r.data) ? r.data : []); setLoading(false) })
-        .catch(() => setLoading(false))
-    })
+    api.get('/social', { params: { limit: 300 } })
+      .then(r => setPosts(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   const platforms = ['hackernews', 'reddit', 'stocktwits']

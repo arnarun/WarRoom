@@ -7,6 +7,8 @@ import aiohttp
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT, from_timestamp
+
 logger = logging.getLogger(__name__)
 
 HN_BASE  = "https://hacker-news.firebaseio.com/v0"
@@ -26,7 +28,7 @@ async def _get_json(session: aiohttp.ClientSession, url: str):
 
 async def fetch_hackernews(db: AsyncSession) -> int:
     inserted = 0
-    connector = aiohttp.TCPConnector(ssl=False)
+    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
     async with aiohttp.ClientSession(connector=connector) as http:
         for feed_name, feed_url in FEEDS.items():
             try:
@@ -42,7 +44,7 @@ async def fetch_hackernews(db: AsyncSession) -> int:
                     score = item.get("score", 0)
                     comments = item.get("descendants", 0)
                     ts    = item.get("time")
-                    pub   = datetime.utcfromtimestamp(ts) if ts else None
+                    pub   = from_timestamp(ts) if ts else None
                     try:
                         await db.execute(
                             text("""

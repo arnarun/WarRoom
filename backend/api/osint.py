@@ -14,8 +14,8 @@ async def get_osint(
     type:     Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     country:  Optional[str] = Query(None),
-    limit:    int           = Query(50, le=200),
-    offset:   int           = Query(0),
+    limit:    int           = Query(50, ge=1, le=500),
+    offset:   int           = Query(0, ge=0),
     db:       AsyncSession  = Depends(get_db),
 ):
     stmt = select(OsintSignal).order_by(OsintSignal.published_at.desc().nulls_last())
@@ -42,8 +42,8 @@ async def get_osint(
             "description":  r.description,
             "url":          r.url,
             "country":      r.country,
-            "published_at": r.published_at.isoformat() if r.published_at else None,
-            "fetched_at":   r.fetched_at.isoformat()   if r.fetched_at   else None,
+            "published_at": (r.published_at.isoformat() + "Z") if r.published_at else None,
+            "fetched_at":   (r.fetched_at.isoformat()   + "Z") if r.fetched_at   else None,
         }
         for r in rows
     ]

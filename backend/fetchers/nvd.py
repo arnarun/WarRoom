@@ -8,6 +8,8 @@ import aiohttp
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT, utcnow
+
 logger = logging.getLogger(__name__)
 
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -40,7 +42,7 @@ def _parse_nvd_date(s: Optional[str]) -> Optional[datetime]:
 
 
 async def fetch_nvd(session: AsyncSession) -> int:
-    now   = datetime.utcnow()
+    now   = utcnow()
     start = now - timedelta(days=7)
 
     params = {
@@ -50,7 +52,7 @@ async def fetch_nvd(session: AsyncSession) -> int:
     }
 
     try:
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT)) as http:
             async with http.get(
                 NVD_URL,
                 params=params,

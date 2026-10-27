@@ -1,3 +1,5 @@
+import { useState, useEffect, useRef } from 'react'
+
 const CATEGORIES = [
   { value: '',                label: 'All' },
   { value: 'politics',        label: 'Politics' },
@@ -35,8 +37,30 @@ const COUNTRIES = [
   { value: 'China',      label: '🇨🇳 China' },
 ]
 
-export default function FilterBar({ filters, onChange }) {
+export default function FilterBar({ filters, onChange, newCount = 0, onMarkRead }) {
   const set = (key, val) => onChange({ ...filters, [key]: val })
+
+  // Search is debounced so typing doesn't fire a request per keystroke
+  const [q, setQ] = useState(filters.q || '')
+  const searchRef = useRef(null)
+  useEffect(() => {
+    if (q === (filters.q || '')) return
+    const id = setTimeout(() => set('q', q), 350)
+    return () => clearTimeout(id)
+  }, [q])
+
+  // "/" focuses search, Escape clears it
+  useEffect(() => {
+    const onKey = e => {
+      const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
+      if (e.key === '/' && !typing) {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="flex flex-wrap items-center gap-3 px-4 py-2 bg-gray-900 border-b border-gray-800">
@@ -83,14 +107,26 @@ export default function FilterBar({ filters, onChange }) {
 
       {/* Search */}
       <input
-        type="text"
-        placeholder="Search…"
-        value={filters.q || ''}
-        onChange={e => set('q', e.target.value)}
+        ref={searchRef}
+        type="search"
+        placeholder="Search…  ( / )"
+        aria-label="Search articles"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur() } }}
         className="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1 w-40 focus:outline-none focus:ring-1 focus:ring-brand placeholder-gray-600"
       />
 
       <div className="ml-auto flex items-center gap-2">
+        {newCount > 0 && (
+          <button
+            type="button"
+            onClick={onMarkRead}
+            className="text-xs text-brand hover:underline"
+          >
+            {newCount} new · mark read
+          </button>
+        )}
         {filters.lastUpdate && (
           <span className="text-gray-600 text-xs">
             Updated {filters.lastUpdate.toLocaleTimeString()}

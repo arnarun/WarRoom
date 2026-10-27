@@ -9,7 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import config
+import jobs
 from database import AsyncSessionLocal
+from maintenance import migrate, prune_old_data
 from fetchers.rss        import fetch_all_rss
 from fetchers.market     import fetch_crypto, fetch_stocks
 from fetchers.hackernews import fetch_hackernews
@@ -28,6 +30,7 @@ from api.market   import router as market_router
 from api.osint    import router as osint_router
 from api.social   import router as social_router
 from api.stream   import router as stream_router
+from api.status   import router as status_router, VERSION
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,25 +45,32 @@ async def _run(fetcher, *args):
     """Wrap a fetcher in a fresh DB session."""
     name = fetcher.__name__
     logger.info("[scheduler] Starting %s", name)
+    t0 = jobs.started(name)
     try:
         async with AsyncSessionLocal() as session:
-            await fetcher(session, *args)
+            result = await fetcher(session, *args)
+        jobs.finished(name, t0, result)
         logger.info("[scheduler] Finished %s", name)
     except Exception as exc:
+        jobs.finished(name, t0, error=exc)
         logger.error("[scheduler] %s FAILED: %s", name, exc, exc_info=True)
 
 
 def _schedule_job(fetcher, interval_seconds: int, run_now: bool = True):
+    jobs.register(fetcher.__name__, interval_seconds)
     if run_now:
         scheduler.add_job(_run, "date", args=[fetcher], misfire_grace_time=60)
     scheduler.add_job(
-        _run, "interval", seconds=interval_seconds, args=[fetcher], misfire_grace_time=60
+        _run, "interval", seconds=interval_seconds, args=[fetcher],
+        misfire_grace_time=60, max_instances=1, coalesce=True,
     )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("WarRoom starting — scheduling fetchers…")
+    logger.info("WarRoom starting — migrating schema…")
+    await migrate()
+    logger.info("Scheduling fetchers…")
 
     _schedule_job(fetch_all_rss,      config.INTERVAL_RSS)
     _schedule_job(fetch_crypto,        config.INTERVAL_MARKET_CRYPTO)
@@ -76,6 +86,7 @@ async def lifespan(app: FastAPI):
     _schedule_job(fetch_darkweb,       config.INTERVAL_OSINT)
     _schedule_job(fetch_nvd,           config.INTERVAL_NVD)
     _schedule_job(fetch_breaking_rss,  config.INTERVAL_BREAKING)
+    _schedule_job(prune_old_data,      config.INTERVAL_RETENTION)
 
     scheduler.start()
     logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
@@ -86,16 +97,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="WarRoom Intelligence API",
-    version="1.0.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
-    allow_origin_regex=r"https://.*\.up\.railway\.app",
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=config.CORS_ORIGIN_REGEX,
+    allow_methods=["GET"],
+    allow_headers=["Cache-Control", "Pragma"],
 )
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
@@ -103,6 +114,10 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         response.headers["Pragma"] = "no-cache"
+        # API is JSON-only; lock down sniffing, framing and referrers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
 app.add_middleware(NoCacheMiddleware)
@@ -112,8 +127,4 @@ app.include_router(market_router,   prefix="/api")
 app.include_router(osint_router,    prefix="/api")
 app.include_router(social_router,   prefix="/api")
 app.include_router(stream_router,   prefix="/api")
-
-
-@app.get("/api/health")
-async def health():
-    return {"status": "ok", "version": "1.0.0"}
+app.include_router(status_router,   prefix="/api")

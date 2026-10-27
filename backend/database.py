@@ -6,7 +6,9 @@ engine = create_async_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_size=5,
-    connect_args={"ssl": DATABASE_SSL},
+    # Pin sessions to UTC so NOW() defaults on TIMESTAMP columns are UTC
+    # regardless of the server's local timezone.
+    connect_args={"ssl": DATABASE_SSL, "server_settings": {"timezone": "UTC"}},
 )
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

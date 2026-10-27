@@ -20,7 +20,9 @@ DATABASE_SSL = os.getenv("DATABASE_SSL", "false").lower() == "true"
 
 # CORS allowed origins — use * for Railway or comma-separated list
 CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
-CORS_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",")]
+CORS_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()]
+# Optional regex for preview deploys; set CORS_ORIGIN_REGEX="" to disable
+CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.up\.railway\.app") or None
 
 GUARDIAN_API_KEY   = os.getenv("GUARDIAN_API_KEY", "")
 NEWSDATA_API_KEY   = os.getenv("NEWSDATA_API_KEY", "")
@@ -41,3 +43,9 @@ INTERVAL_OSINT         = 1800  # 30 min
 INTERVAL_NVD           = 1800  # 30 min — NVD CVE feed
 INTERVAL_SOCIAL        = 1800  # 30 min
 INTERVAL_GDELT         = 1800  # 30 min
+INTERVAL_RETENTION     = 21600 # 6 h  — prune old rows
+
+# Data retention (days); 0 disables pruning for that table
+RETENTION_DAYS_ARTICLES = int(os.getenv("RETENTION_DAYS_ARTICLES", "30"))
+RETENTION_DAYS_OSINT    = int(os.getenv("RETENTION_DAYS_OSINT", "30"))
+RETENTION_DAYS_SOCIAL   = int(os.getenv("RETENTION_DAYS_SOCIAL", "14"))

@@ -18,6 +18,8 @@ import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 TOR_HOST = "127.0.0.1"
@@ -67,7 +69,7 @@ def _infer_severity(title: str) -> str:
 
 async def _ingest_clearnet(session: AsyncSession) -> int:
     inserted = 0
-    connector = aiohttp.TCPConnector(ssl=False)
+    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
     headers = {
         "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0)",
         "Accept": "application/rss+xml, application/xml, */*",

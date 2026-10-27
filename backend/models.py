@@ -1,10 +1,12 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, Float, Integer, TIMESTAMP, ARRAY
+from sqlalchemy import String, Text, Float, Integer, TIMESTAMP, ARRAY, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import NUMERIC
 from database import Base
+
+_UTC_NOW = text("timezone('utc', now())")
 
 
 class Article(Base):
@@ -19,7 +21,7 @@ class Article(Base):
     url:          Mapped[str]                = mapped_column(Text, unique=True, nullable=False)
     image_url:    Mapped[Optional[str]]      = mapped_column(Text)
     published_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
-    fetched_at:   Mapped[datetime]           = mapped_column(TIMESTAMP, default=datetime.utcnow)
+    fetched_at:   Mapped[datetime]           = mapped_column(TIMESTAMP, server_default=_UTC_NOW)
     tags:         Mapped[Optional[List[str]]]= mapped_column(ARRAY(Text))
     country:      Mapped[Optional[str]]      = mapped_column(String(50))
 
@@ -36,7 +38,7 @@ class MarketPrice(Base):
     change_7d:  Mapped[Optional[float]]= mapped_column(Float)
     volume_24h: Mapped[Optional[float]]= mapped_column(Float)
     market_cap: Mapped[Optional[float]]= mapped_column(Float)
-    updated_at: Mapped[datetime]       = mapped_column(TIMESTAMP, default=datetime.utcnow)
+    updated_at: Mapped[datetime]       = mapped_column(TIMESTAMP, server_default=_UTC_NOW)
 
 
 class OsintSignal(Base):
@@ -51,7 +53,7 @@ class OsintSignal(Base):
     url:          Mapped[Optional[str]]      = mapped_column(Text)
     country:      Mapped[Optional[str]]      = mapped_column(String(100))
     published_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
-    fetched_at:   Mapped[datetime]           = mapped_column(TIMESTAMP, default=datetime.utcnow)
+    fetched_at:   Mapped[datetime]           = mapped_column(TIMESTAMP, server_default=_UTC_NOW)
 
 
 class SocialPost(Base):
@@ -66,4 +68,4 @@ class SocialPost(Base):
     num_comments: Mapped[Optional[int]]      = mapped_column(Integer)
     sentiment:    Mapped[Optional[str]]      = mapped_column(String(20))
     published_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
-    fetched_at:   Mapped[datetime]           = mapped_column(TIMESTAMP, default=datetime.utcnow)
+    fetched_at:   Mapped[datetime]           = mapped_column(TIMESTAMP, server_default=_UTC_NOW)

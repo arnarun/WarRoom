@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from 'date-fns'
+import { safeUrl } from '../lib/storage'
 
 const SEVERITY_STYLES = {
   critical: 'bg-red-900 text-red-300 border-red-700',
@@ -57,7 +58,7 @@ export default function SignalCard({ signal }) {
 
   return (
     <a
-      href={signal.url || '#'}
+      href={safeUrl(signal.url)}
       target="_blank"
       rel="noopener noreferrer"
       className="block p-3 border border-gray-800 rounded bg-gray-900 hover:border-gray-600 transition-colors"

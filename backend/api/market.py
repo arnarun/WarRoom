@@ -42,7 +42,7 @@ async def get_market(
             "change_7d":  _f(r.change_7d),
             "volume_24h": _f(r.volume_24h),
             "market_cap": _f(r.market_cap),
-            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            "updated_at": (r.updated_at.isoformat() + "Z") if r.updated_at else None,
         }
         for r in rows
     ]

@@ -10,6 +10,8 @@ import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 CISA_FEEDS = [
@@ -47,7 +49,7 @@ def _parse_date(entry) -> Optional[datetime]:
 
 async def fetch_cisa(session: AsyncSession) -> int:
     inserted = 0
-    connector = aiohttp.TCPConnector(ssl=False)
+    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
     async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
         for feed_url, signal_type, country in CISA_FEEDS:
             source_name = _SOURCE_MAP.get(country, "cert")

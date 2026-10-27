@@ -10,6 +10,8 @@ import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 _HEADERS = {
@@ -102,7 +104,7 @@ async def _ingest_feed(
 
 async def fetch_breach(session: AsyncSession) -> int:
     total = 0
-    connector = aiohttp.TCPConnector(ssl=False)
+    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
     async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
         for feed_url, signal_type, source_name, country in BREACH_FEEDS + PEOPLE_FEEDS + THREAT_ACTOR_FEEDS:
             total += await _ingest_feed(session, http, feed_url, signal_type, source_name, country)

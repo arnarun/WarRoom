@@ -2,16 +2,22 @@
 
 A self-hosted dashboard aggregating OSINT signals, global news, live market prices, and social sentiment.
 
+## Requirements
+- Python **3.13** (managed via [uv](https://docs.astral.sh/uv/) locally; Docker image uses `python:3.13-slim`)
+- Node **20.19+ / 22.12+** (Vite 8); Docker image uses `node:24-alpine`
+- PostgreSQL 16
+
 ## Quick Start (Mac Local)
 
 ### 1. Backend
 ```bash
 cd WarRoom/backend
-cp ../.env.example ../.env   # add API keys (optional for Phase 1)
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+cp ../.env.example ../.env   # API keys are optional
+uv venv --python 3.13 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
 .venv/bin/uvicorn main:app --reload --port 8000
 ```
+Schema creation and migrations run automatically on startup (`maintenance.py`).
 
 ### 2. Frontend
 ```bash
@@ -20,44 +26,43 @@ npm install
 npm run dev      # → http://localhost:5173
 ```
 
-### 3. Database
-```bash
-# DB already created via schema.sql. To re-create:
-export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
-psql -U $USER -d warroom -f backend/schema.sql
-```
-
 ## Verify
 ```bash
-curl http://localhost:8000/api/health          # {"status":"ok"}
-curl http://localhost:8000/api/articles        # JSON array (fills after ~60s)
+curl http://localhost:8000/api/health          # {"status":"ok","db":"up",...}
+curl http://localhost:8000/api/status          # per-fetcher runs, failing feeds, table sizes
+curl http://localhost:8000/api/articles        # JSON array (fills after ~20s)
 curl http://localhost:8000/api/market          # prices
 curl http://localhost:8000/api/osint           # signals
-curl -N http://localhost:8000/api/stream/prices # SSE stream
 ```
 
-## API Keys (Optional — more sources)
-Copy `.env.example` to `.env` and fill in:
-- `GUARDIAN_API_KEY`   — https://open-platform.theguardian.com
-- `NEWSDATA_API_KEY`   — https://newsdata.io
-- `REDDIT_CLIENT_ID`   — https://www.reddit.com/prefs/apps
-- `REDDIT_CLIENT_SECRET`
+## Features
+- **Feed** — one column per category, hot-topics carousel, debounced search (press `/`), NEW badges for articles fetched since your last visit
+- **Market / OSINT / Social** — prices, CERT alerts, CVEs, malware, breaches, dark-web news, HN/Reddit/StockTwits
+- **Saved** — star any article to keep it (stored in your browser)
+- **Status** — fetcher health, last run/duration/new rows, failing & empty RSS feeds, data freshness; health dot in the footer
 
-No key needed: CoinGecko, yfinance, Hacker News, abuse.ch, CISA RSS, GDELT.
+## Configuration
+See `.env.example`. Notable settings:
+- `CORS_ORIGINS`, `CORS_ORIGIN_REGEX` — allowed frontend origins (API is GET-only)
+- `RETENTION_DAYS_ARTICLES` / `_OSINT` / `_SOCIAL` — old rows are pruned every 6h
+- `GUARDIAN_API_KEY`, `NEWSDATA_API_KEY`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` — optional sources
+
+No key needed: CoinGecko, yfinance, Hacker News, abuse.ch, CISA/NCSC/ENISA/BSI, NVD, GDELT.
 
 ## VPS Deployment (Docker)
 ```bash
-cp .env.example .env   # fill in keys
+cp .env.example .env   # set POSTGRES_PASSWORD and keys
 docker compose up -d
-# → frontend at :5173, backend at :8000
+# → frontend at :5173, backend at :8000 (Postgres bound to 127.0.0.1:5433)
 ```
+Containers run as non-root (backend), with health checks and security headers (nginx CSP, nosniff, frame-deny).
 
-## Data Sources (Phase 1)
-- **53 RSS feeds** — BBC, Reuters, Al Jazeera, FT, WSJ, TechCrunch, Ars Technica, etc.
-- **CISA** — US cybersecurity alerts
-- **abuse.ch** — URLhaus + MalwareBazaar threat intel
-- **Hacker News** — Top/Show/Ask HN via Firebase API
-- **CoinGecko** — 10 crypto prices (1-min refresh)
-- **yfinance** — 14 stocks/ETFs + forex (5-min refresh)
-- **GDELT** — Global events & tone
-- **Reddit/StockTwits** — social sentiment (needs credentials)
+## Data Sources
+- **106 RSS feeds** (`backend/sources.json`) — fetched concurrently every 15 min; `breaking: true` sources every 5 min
+- **CISA / NCSC / ENISA / BSI** — CERT alerts
+- **NVD** — CVEs from the last 7 days
+- **abuse.ch** — URLhaus + MalwareBazaar
+- **AlienVault OTX**, breach trackers, clearnet dark-web news (+ Tor feeds if a local Tor proxy is running)
+- **Hacker News**, **Reddit** (needs credentials), **StockTwits**
+- **CoinGecko** (1 min), **yfinance** stocks/ETFs/forex (5 min)
+- **GDELT** — global events (requests spaced ≥5s apart per GDELT's limit)

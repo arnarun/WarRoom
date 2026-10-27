@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS articles (
   url          TEXT UNIQUE NOT NULL,
   image_url    TEXT,
   published_at TIMESTAMP,
-  fetched_at   TIMESTAMP DEFAULT NOW(),
+  fetched_at   TIMESTAMP DEFAULT timezone('utc', now()),
   tags         TEXT[],
   country      VARCHAR(50)
 );
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS market_prices (
   change_7d   FLOAT,
   volume_24h  FLOAT,
   market_cap  FLOAT,
-  updated_at  TIMESTAMP DEFAULT NOW()
+  updated_at  TIMESTAMP DEFAULT timezone('utc', now())
 );
 
 CREATE TABLE IF NOT EXISTS osint_signals (
@@ -43,10 +43,11 @@ CREATE TABLE IF NOT EXISTS osint_signals (
   url          TEXT,
   country      VARCHAR(100),
   published_at TIMESTAMP,
-  fetched_at   TIMESTAMP DEFAULT NOW()
+  fetched_at   TIMESTAMP DEFAULT timezone('utc', now())
 );
 CREATE INDEX IF NOT EXISTS idx_osint_source    ON osint_signals(source);
 CREATE INDEX IF NOT EXISTS idx_osint_type      ON osint_signals(type);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_osint_source_url ON osint_signals(source, url);
 CREATE INDEX IF NOT EXISTS idx_osint_published ON osint_signals(published_at DESC);
 
 CREATE TABLE IF NOT EXISTS social_posts (
@@ -59,7 +60,7 @@ CREATE TABLE IF NOT EXISTS social_posts (
   num_comments INTEGER,
   sentiment    VARCHAR(20),           -- bullish, bearish, neutral or null
   published_at TIMESTAMP,
-  fetched_at   TIMESTAMP DEFAULT NOW()
+  fetched_at   TIMESTAMP DEFAULT timezone('utc', now())
 );
 CREATE INDEX IF NOT EXISTS idx_social_platform  ON social_posts(platform);
 CREATE INDEX IF NOT EXISTS idx_social_published ON social_posts(published_at DESC);

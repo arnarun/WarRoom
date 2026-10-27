@@ -6,6 +6,8 @@ import aiohttp
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 SYMBOLS = ["SPY", "AAPL", "NVDA", "BTC.X", "ETH.X", "TSLA"]
@@ -15,7 +17,7 @@ ST_STREAM   = "https://api.stocktwits.com/api/2/streams/symbol/{sym}.json"
 
 async def fetch_stocktwits(session: AsyncSession) -> int:
     inserted = 0
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT)) as http:
         for sym in SYMBOLS:
             try:
                 url = ST_STREAM.format(sym=sym)

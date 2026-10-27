@@ -10,6 +10,8 @@ import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 OTX_RSS = "https://otx.alienvault.com/rss.xml"
@@ -45,7 +47,7 @@ def _infer_severity(title: str, desc: str) -> str:
 async def fetch_alienvault(session: AsyncSession) -> int:
     inserted = 0
     try:
-        connector = aiohttp.TCPConnector(ssl=False)
+        connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
         async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
             async with http.get(OTX_RSS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 logger.info("AlienVault OTX HTTP %d", resp.status)

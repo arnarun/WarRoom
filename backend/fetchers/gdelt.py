@@ -1,4 +1,5 @@
 """GDELT DOC 2.0 API fetcher → articles table."""
+import asyncio
 import logging
 from datetime import datetime
 
@@ -6,9 +7,13 @@ import aiohttp
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fetchers.common import SSL_CONTEXT
+
 logger = logging.getLogger(__name__)
 
 GDELT_API = "https://api.gdeltproject.org/api/v2/doc/doc"
+# GDELT rejects more than one request per 5 seconds with a plain-text error
+GDELT_SPACING_S = 6
 
 QUERIES = [
     {"query": "geopolitics conflict",    "category": "geopolitics", "region": "global"},
@@ -20,8 +25,10 @@ QUERIES = [
 
 async def fetch_gdelt(session: AsyncSession) -> int:
     inserted = 0
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as http:
-        for q in QUERIES:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT)) as http:
+        for i, q in enumerate(QUERIES):
+            if i:
+                await asyncio.sleep(GDELT_SPACING_S)
             try:
                 params = {
                     "query":      q["query"],
@@ -51,16 +58,16 @@ async def fetch_gdelt(session: AsyncSession) -> int:
                         await session.execute(
                             text("""
                                 INSERT INTO articles
-                                  (source, category, region, title, summary, url, published_at)
+                                  (source, category, region, title, image_url, url, published_at)
                                 VALUES
-                                  ('GDELT', :cat, :region, :title, :summary, :url, :pub)
+                                  ('GDELT', :cat, :region, :title, :image, :url, :pub)
                                 ON CONFLICT (url) DO NOTHING
                             """),
                             {
                                 "cat":     q["category"],
                                 "region":  q["region"],
                                 "title":   title,
-                                "summary": art.get("socialimage"),
+                                "image":   art.get("socialimage") or None,
                                 "url":     url,
                                 "pub":     pub,
                             },

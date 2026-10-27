@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
@@ -7,12 +5,17 @@ services:
     environment:
       POSTGRES_DB:       warroom
       POSTGRES_USER:     warroom
-      POSTGRES_PASSWORD: warroom_secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-warroom_secret}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
     ports:
-      - "5433:5432"    # expose on 5433 to avoid conflict with local pg16
+      - "127.0.0.1:5433:5432"    # localhost only; 5433 avoids conflict with local pg16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warroom -d warroom"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -20,11 +23,13 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://warroom:warroom_secret@db:5432/warroom
+      DATABASE_URL: postgresql+asyncpg://warroom:${POSTGRES_PASSWORD:-warroom_secret}@db:5432/warroom
+      CORS_ORIGINS: http://localhost:5173
     env_file:
       - .env
 
@@ -32,6 +37,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
     restart: unless-stopped
     depends_on:
       - backend

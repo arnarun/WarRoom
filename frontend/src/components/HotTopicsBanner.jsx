@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useHotTopics } from '../hooks/useHotTopics'
+import { safeUrl } from '../lib/storage'
 
 const CAT_GRADIENTS = {
   politics:         'from-blue-900/90 to-blue-950/95',
@@ -99,7 +100,7 @@ export default function HotTopicsBanner() {
           return (
             <a
               key={a.id}
-              href={a.url}
+              href={safeUrl(a.url)}
               target="_blank"
               rel="noopener noreferrer"
               className="relative flex-none h-full"

@@ -1,11 +1,12 @@
 """Reddit fetcher — PRAW → social_posts. Skipped gracefully if no credentials."""
+import asyncio
 import logging
-from datetime import datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import config
+from fetchers.common import from_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -32,36 +33,43 @@ async def fetch_reddit(session: AsyncSession) -> int:
         user_agent=config.REDDIT_USER_AGENT,
     )
 
+    def _hot(sub_name):
+        # PRAW is synchronous — run it off the event loop
+        return [
+            {
+                "sub":      sub_name,
+                "title":    post.title,
+                "url":      f"https://reddit.com{post.permalink}",
+                "score":    post.score,
+                "comments": post.num_comments,
+                "pub":      from_timestamp(post.created_utc),
+            }
+            for post in reddit.subreddit(sub_name).hot(limit=25)
+        ]
+
     inserted = 0
     for sub_name in SUBREDDITS:
         try:
-            sub = reddit.subreddit(sub_name)
-            for post in sub.hot(limit=25):
-                url = f"https://reddit.com{post.permalink}"
-                try:
-                    await session.execute(
-                        text("""
-                            INSERT INTO social_posts
-                              (platform, community, title, url, score, num_comments, published_at)
-                            VALUES
-                              ('reddit', :sub, :title, :url, :score, :comments, :pub)
-                            ON CONFLICT (url) DO UPDATE SET
-                              score=EXCLUDED.score, num_comments=EXCLUDED.num_comments
-                        """),
-                        {
-                            "sub":      sub_name,
-                            "title":    post.title,
-                            "url":      url,
-                            "score":    post.score,
-                            "comments": post.num_comments,
-                            "pub":      datetime.utcfromtimestamp(post.created_utc),
-                        },
-                    )
-                    inserted += 1
-                except Exception as e:
-                    logger.debug("Reddit insert skip: %s", e)
+            posts = await asyncio.to_thread(_hot, sub_name)
         except Exception as e:
             logger.warning("Reddit r/%s error: %s", sub_name, e)
+            continue
+        for row in posts:
+            try:
+                await session.execute(
+                    text("""
+                        INSERT INTO social_posts
+                          (platform, community, title, url, score, num_comments, published_at)
+                        VALUES
+                          ('reddit', :sub, :title, :url, :score, :comments, :pub)
+                        ON CONFLICT (url) DO UPDATE SET
+                          score=EXCLUDED.score, num_comments=EXCLUDED.num_comments
+                    """),
+                    row,
+                )
+                inserted += 1
+            except Exception as e:
+                logger.debug("Reddit insert skip: %s", e)
 
     await session.commit()
     logger.info("Reddit: upserted %d posts", inserted)
