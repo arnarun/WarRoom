@@ -11,7 +11,7 @@ RUN pip install -r requirements.txt
 
 COPY . .
 RUN chmod +x start.sh \
- && useradd --system --no-create-home --uid 10001 warroom \
+ && useradd --system --create-home --uid 10001 warroom \
  && chown -R warroom /app
 USER warroom
 
