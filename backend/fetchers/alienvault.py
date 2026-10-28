@@ -1,36 +1,33 @@
-"""AlienVault OTX threat intelligence fetcher (public RSS feed — no API key required)."""
+"""AlienVault OTX threat intelligence fetcher → osint_signals.
+
+The public RSS feed was discontinued; this uses the OTX API, which needs a
+free key (OTX_API_KEY). Skipped without one.
+"""
 from __future__ import annotations
 import logging
-import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import aiohttp
-import feedparser
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fetchers.common import SSL_CONTEXT
+import config
+from fetchers.common import SSL_CONTEXT, utcnow
 
 logger = logging.getLogger(__name__)
 
-OTX_RSS = "https://otx.alienvault.com/rss.xml"
-
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; WarRoomBot/1.0)",
-    "Accept": "application/rss+xml, application/xml, */*",
-}
+OTX_PULSES = "https://otx.alienvault.com/api/v1/pulses/subscribed"
+OTX_LIMIT  = 30
 
 
-def _parse_date(entry) -> Optional[datetime]:
-    for attr in ("published_parsed", "updated_parsed"):
-        t = getattr(entry, attr, None)
-        if t:
-            try:
-                return datetime(*t[:6])
-            except Exception:
-                pass
-    return None
+def _parse_date(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s[:19])
+    except ValueError:
+        return None
 
 
 def _infer_severity(title: str, desc: str) -> str:
@@ -45,43 +42,59 @@ def _infer_severity(title: str, desc: str) -> str:
 
 
 async def fetch_alienvault(session: AsyncSession) -> int:
-    inserted = 0
+    if not config.OTX_API_KEY:
+        logger.info("AlienVault OTX: OTX_API_KEY not set — skipping")
+        return 0
+
+    params = {
+        "limit": OTX_LIMIT,
+        "modified_since": (utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S"),
+    }
     try:
-        connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
-        async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as http:
-            async with http.get(OTX_RSS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                logger.info("AlienVault OTX HTTP %d", resp.status)
-                content = await resp.text(errors="replace")
-
-        feed = feedparser.parse(content)
-        logger.info("AlienVault OTX: %d entries in feed", len(feed.entries))
-
-        for entry in feed.entries[:30]:
-            title = getattr(entry, "title", "").strip()
-            if not title:
-                continue
-            desc = getattr(entry, "summary", "") or ""
-            desc = re.sub(r"<[^>]+>", "", desc).strip()[:2000]
-            url = getattr(entry, "link", None)
-            pub = _parse_date(entry)
-            severity = _infer_severity(title, desc)
-
-            try:
-                await session.execute(
-                    text("""
-                        INSERT INTO osint_signals
-                          (source, type, severity, title, description, url, published_at)
-                        VALUES
-                          ('alienvault', 'threat-intel', :severity, :title, :desc, :url, :pub)
-                        ON CONFLICT DO NOTHING
-                    """),
-                    {"severity": severity, "title": title, "desc": desc, "url": url, "pub": pub},
-                )
-                inserted += 1
-            except Exception as e:
-                logger.debug("AlienVault skip: %s", e)
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT)) as http:
+            async with http.get(
+                OTX_PULSES,
+                params=params,
+                headers={"X-OTX-API-KEY": config.OTX_API_KEY},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning("AlienVault OTX HTTP %d", resp.status)
+                    return 0
+                data = await resp.json(content_type=None)
     except Exception as e:
         logger.warning("AlienVault fetch error: %s", e)
+        return 0
+
+    inserted = 0
+    for pulse in data.get("results", []):
+        title = (pulse.get("name") or "").strip()
+        if not title or not pulse.get("id"):
+            continue
+        desc = (pulse.get("description") or "").strip()
+        tags = ", ".join((pulse.get("tags") or [])[:8])
+        if tags:
+            desc = f"{desc}\nTags: {tags}".strip()
+        try:
+            result = await session.execute(
+                text("""
+                    INSERT INTO osint_signals
+                      (source, type, severity, title, description, url, published_at)
+                    VALUES
+                      ('alienvault', 'threat-intel', :severity, :title, :desc, :url, :pub)
+                    ON CONFLICT DO NOTHING
+                """),
+                {
+                    "severity": _infer_severity(title, desc),
+                    "title":    title[:500],
+                    "desc":     desc[:2000],
+                    "url":      f"https://otx.alienvault.com/pulse/{pulse['id']}",
+                    "pub":      _parse_date(pulse.get("created")),
+                },
+            )
+            inserted += result.rowcount or 0
+        except Exception as e:
+            logger.debug("AlienVault skip: %s", e)
 
     await session.commit()
     logger.info("AlienVault OTX: inserted %d signals", inserted)

@@ -46,8 +46,9 @@ See `.env.example`. Notable settings:
 - `CORS_ORIGINS`, `CORS_ORIGIN_REGEX` — allowed frontend origins (API is GET-only)
 - `RETENTION_DAYS_ARTICLES` / `_OSINT` / `_SOCIAL` — old rows are pruned every 6h
 - `GUARDIAN_API_KEY`, `NEWSDATA_API_KEY`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` — optional sources
+- `NVD_API_KEY`, `ABUSECH_AUTH_KEY`, `OTX_API_KEY` — free keys; without them NVD is throttled and URLhaus/MalwareBazaar/OTX are skipped
 
-No key needed: CoinGecko, yfinance, Hacker News, abuse.ch, CISA/NCSC/ENISA/BSI, NVD, GDELT.
+No key needed: CoinGecko, yfinance, Hacker News, StockTwits, CISA (alerts + KEV), NCSC/ENISA/BSI, NVD, Feodo Tracker, GDELT.
 
 ## VPS Deployment (Docker)
 ```bash
@@ -60,9 +61,9 @@ Containers run as non-root (backend), with health checks and security headers (n
 ## Data Sources
 - **106 RSS feeds** (`backend/sources.json`) — fetched concurrently every 15 min; `breaking: true` sources every 5 min
 - **CISA / NCSC / ENISA / BSI** — CERT alerts
-- **NVD** — CVEs from the last 7 days
-- **abuse.ch** — URLhaus + MalwareBazaar
-- **AlienVault OTX**, breach trackers, clearnet dark-web news (+ Tor feeds if a local Tor proxy is running)
+- **NVD** — CVEs from the last 7 days; **CISA KEV** — actively exploited CVEs
+- **abuse.ch** — Feodo Tracker botnet C2s; URLhaus + MalwareBazaar with `ABUSECH_AUTH_KEY`
+- **AlienVault OTX** (with `OTX_API_KEY`), breach trackers, clearnet dark-web news (+ Tor feeds if a local Tor proxy is running)
 - **Hacker News**, **Reddit** (needs credentials), **StockTwits**
 - **CoinGecko** (1 min), **yfinance** stocks/ETFs/forex (5 min)
 - **GDELT** — global events (requests spaced ≥5s apart per GDELT's limit)

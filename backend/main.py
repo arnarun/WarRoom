@@ -23,7 +23,7 @@ from fetchers.stocktwits import fetch_stocktwits
 from fetchers.alienvault import fetch_alienvault
 from fetchers.breach     import fetch_breach
 from fetchers.darkweb    import fetch_darkweb
-from fetchers.nvd        import fetch_nvd
+from fetchers.nvd        import fetch_nvd, fetch_cisa_kev
 from fetchers.breaking   import fetch_breaking_rss
 from api.articles import router as articles_router
 from api.market   import router as market_router
@@ -85,6 +85,7 @@ async def lifespan(app: FastAPI):
     _schedule_job(fetch_breach,        config.INTERVAL_OSINT)
     _schedule_job(fetch_darkweb,       config.INTERVAL_OSINT)
     _schedule_job(fetch_nvd,           config.INTERVAL_NVD)
+    _schedule_job(fetch_cisa_kev,      config.INTERVAL_KEV)
     _schedule_job(fetch_breaking_rss,  config.INTERVAL_BREAKING)
     _schedule_job(prune_old_data,      config.INTERVAL_RETENTION)
 

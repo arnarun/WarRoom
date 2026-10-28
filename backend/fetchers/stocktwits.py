@@ -2,11 +2,9 @@
 import logging
 from datetime import datetime
 
-import aiohttp
+from curl_cffi.requests import AsyncSession as CurlSession
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from fetchers.common import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +15,15 @@ ST_STREAM   = "https://api.stocktwits.com/api/2/streams/symbol/{sym}.json"
 
 async def fetch_stocktwits(session: AsyncSession) -> int:
     inserted = 0
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT)) as http:
+    # Chrome impersonation: StockTwits' Cloudflare challenges aiohttp's TLS fingerprint
+    async with CurlSession(impersonate="chrome") as http:
         for sym in SYMBOLS:
             try:
-                url = ST_STREAM.format(sym=sym)
-                async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status != 200:
-                        continue
-                    data = await resp.json(content_type=None)
+                resp = await http.get(ST_STREAM.format(sym=sym), timeout=10)
+                if resp.status_code != 200:
+                    logger.warning("StockTwits %s HTTP %d", sym, resp.status_code)
+                    continue
+                data = resp.json()
 
                 for msg in (data.get("messages") or [])[:10]:
                     body = msg.get("body", "").strip()

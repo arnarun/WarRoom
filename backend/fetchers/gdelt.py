@@ -1,5 +1,6 @@
 """GDELT DOC 2.0 API fetcher → articles table."""
 import asyncio
+import json
 import logging
 from datetime import datetime
 
@@ -40,7 +41,12 @@ async def fetch_gdelt(session: AsyncSession) -> int:
                 async with http.get(
                     GDELT_API, params=params, timeout=aiohttp.ClientTimeout(total=20)
                 ) as resp:
-                    data = await resp.json(content_type=None)
+                    body = await resp.text(errors="replace")
+                if body.startswith("Please limit requests"):
+                    # IP-wide limit; more queries now only extend the penalty
+                    logger.warning("GDELT rate-limited — skipping remaining queries this cycle")
+                    break
+                data = json.loads(body)
 
                 for art in (data.get("articles") or []):
                     url   = art.get("url", "")

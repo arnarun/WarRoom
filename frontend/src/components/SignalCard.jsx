@@ -19,6 +19,8 @@ const SOURCE_ICONS = {
   acled:          '⚔',
   alienvault:     '👁',
   nvd:            '🩹',
+  'cisa-kev':     '🚨',
+  feodo:          '🤖',
   'darkweb-news': '🌐',
   tor:            '🧅',
   haveibeenpwned: '🔓',

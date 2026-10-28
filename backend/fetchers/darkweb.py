@@ -30,7 +30,7 @@ CLEARNET_FEEDS = [
     ("https://darkwebinformer.com/feed/",             "DarkWebInformer"),
     ("https://www.recordedfuture.com/feed",           "Recorded Future"),
     ("https://flashpoint.io/feed/",                   "Flashpoint"),
-    ("https://socradar.io/feed/",                     "SOCRadar"),
+    ("https://therecord.media/feed",                  "The Record"),
 ]
 
 

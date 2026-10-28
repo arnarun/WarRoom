@@ -26,7 +26,6 @@ BREACH_FEEDS = [
 
 PEOPLE_FEEDS = [
     ("https://techcrunch.com/category/startups/feed/",             "people",  "TechCrunch",       "US"),
-    ("https://feeds.feedburner.com/venturebeat/SZYF",              "people",  "VentureBeat",      "US"),
 ]
 
 THREAT_ACTOR_FEEDS = [

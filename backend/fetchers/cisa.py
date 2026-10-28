@@ -19,8 +19,8 @@ CISA_FEEDS = [
     ("https://www.cisa.gov/uscert/ncas/current-activity.xml", "cyber-threat", "US"),
     ("https://www.cisa.gov/uscert/ncas/bulletins.xml",        "cyber-threat", "US"),
     ("https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml", "cyber-threat", "UK"),
-    ("https://www.enisa.europa.eu/rss",                            "cyber-threat", "EU"),
-    ("https://www.bsi.bund.de/SiteGlobals/Functions/RSSFeed/RSSNewsfeed_Aktuell/RSSNewsfeed_Aktuell_node.html", "cyber-threat", "Germany"),
+    ("https://news.google.com/rss/search?q=site:enisa.europa.eu&hl=en-US&gl=US&ceid=US:en", "cyber-threat", "EU"),
+    ("https://wid.cert-bund.de/content/public/securityAdvisory/rss", "cyber-threat", "Germany"),
 ]
 
 _SOURCE_MAP = {

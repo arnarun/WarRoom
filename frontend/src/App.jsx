@@ -282,8 +282,8 @@ function OsintView({ signals, loading }) {
   })
 
   const cisa    = filtered.filter(s => ['cisa', 'ncsc-uk', 'enisa', 'bsi', 'cert-in'].includes(s.source))
-  const nvd     = filtered.filter(s => s.source === 'nvd')
-  const malware = filtered.filter(s => ['urlhaus', 'malwarebazaar'].includes(s.source))
+  const nvd     = filtered.filter(s => ['nvd', 'cisa-kev'].includes(s.source))
+  const malware = filtered.filter(s => ['urlhaus', 'malwarebazaar', 'feodo'].includes(s.source))
   const threat  = filtered.filter(s => ['alienvault'].includes(s.source))
   const breach  = filtered.filter(s => s.type === 'breach')
   const darkweb = filtered.filter(s => ['darkweb-news', 'tor'].includes(s.source) || s.type === 'darkweb')

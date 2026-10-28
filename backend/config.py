@@ -32,6 +32,10 @@ REDDIT_CLIENT_ID   = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT  = os.getenv("REDDIT_USER_AGENT", "WarRoom/1.0")
 CRUNCHBASE_API_KEY = os.getenv("CRUNCHBASE_API_KEY", "")
+# Free keys — sources are skipped (abuse.ch, OTX) or rate-limited (NVD) without them
+NVD_API_KEY        = os.getenv("NVD_API_KEY", "")       # nvd.nist.gov/developers/request-an-api-key
+ABUSECH_AUTH_KEY   = os.getenv("ABUSECH_AUTH_KEY", "")  # auth.abuse.ch
+OTX_API_KEY        = os.getenv("OTX_API_KEY", "")       # otx.alienvault.com → Settings → API key
 
 # Fetch intervals (seconds)
 INTERVAL_RSS           = 900   # 15 min — full RSS sweep
@@ -41,6 +45,7 @@ INTERVAL_MARKET_STOCKS = 300   # 5 min
 INTERVAL_HN            = 900   # 15 min
 INTERVAL_OSINT         = 1800  # 30 min
 INTERVAL_NVD           = 1800  # 30 min — NVD CVE feed
+INTERVAL_KEV           = 21600 # 6 h   — CISA KEV catalog (updated ~daily)
 INTERVAL_SOCIAL        = 1800  # 30 min
 INTERVAL_GDELT         = 1800  # 30 min
 INTERVAL_RETENTION     = 21600 # 6 h  — prune old rows
