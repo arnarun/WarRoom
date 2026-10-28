@@ -178,8 +178,7 @@ async def group_osint() -> list[Result]:
         results += [
             await probe_json(http, "osint", "feodo tracker", abusech.FEODO_BLOCKLIST,
                              check=lambda j: len(j) > 0),
-            await probe_json(http, "osint", "urlhaus", abusech.URLHAUS_API, method="POST",
-                             data={"limit": "3"}, headers=abuse_hdr,
+            await probe_json(http, "osint", "urlhaus", abusech.URLHAUS_API, headers=abuse_hdr,
                              check=lambda j: j.get("query_status") == "ok")
             if config.ABUSECH_AUTH_KEY else skipped("osint", "urlhaus", abusech.URLHAUS_API, "ABUSECH_AUTH_KEY"),
             await probe_json(http, "osint", "malwarebazaar", abusech.MALWAREBAZAAR_API, method="POST",

@@ -18,7 +18,7 @@ from fetchers.common import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
-URLHAUS_API       = "https://urlhaus-api.abuse.ch/v1/urls/recent/"
+URLHAUS_API       = "https://urlhaus-api.abuse.ch/v1/urls/recent/limit/20/"  # GET only
 MALWAREBAZAAR_API = "https://mb-api.abuse.ch/api/v1/"
 FEODO_BLOCKLIST   = "https://feodotracker.abuse.ch/downloads/ipblocklist.json"
 FEODO_LIMIT       = 30
@@ -82,10 +82,9 @@ async def _fetch_feodo(session: AsyncSession, http: aiohttp.ClientSession) -> in
 async def _fetch_urlhaus(session: AsyncSession, http: aiohttp.ClientSession) -> int:
     inserted = 0
     try:
-        async with http.post(
+        async with http.get(
             URLHAUS_API,
-            data={"limit": "20"},
-            timeout=aiohttp.ClientTimeout(total=15),
+            timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
             data = await resp.json(content_type=None)
             logger.info("URLhaus status=%s, urls=%d", data.get("query_status"), len(data.get("urls", [])))
@@ -110,7 +109,7 @@ async def _fetch_urlhaus(session: AsyncSession, http: aiohttp.ClientSession) -> 
             except Exception as e:
                 logger.debug("URLhaus insert skip: %s", e)
     except Exception as e:
-        logger.warning("URLhaus API error: %s", e)
+        logger.warning("URLhaus API error: %r", e)
     return inserted
 
 
@@ -120,9 +119,10 @@ async def _fetch_malwarebazaar(session: AsyncSession, http: aiohttp.ClientSessio
         async with http.post(
             MALWAREBAZAAR_API,
             data={"query": "get_recent", "selector": "100"},
-            timeout=aiohttp.ClientTimeout(total=15),
+            timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
             data = await resp.json(content_type=None)
+            logger.info("MalwareBazaar status=%s, samples=%d", data.get("query_status"), len(data.get("data") or []))
         for item in (data.get("data") or [])[:20]:
             try:
                 await session.execute(
@@ -144,7 +144,7 @@ async def _fetch_malwarebazaar(session: AsyncSession, http: aiohttp.ClientSessio
             except Exception as e:
                 logger.debug("MalwareBazaar insert skip: %s", e)
     except Exception as e:
-        logger.warning("MalwareBazaar API error: %s", e)
+        logger.warning("MalwareBazaar API error: %r", e)
     return inserted
 
 
